@@ -387,7 +387,8 @@ class operator_clm_FLX:
             # load in the data, check if location is valid
             date_parser = lambda x: pd.to_datetime(x, format='%Y%m%d')
             date_column = 'TIMESTAMP'
-            file = glob('/p/scratch/cjibg36/kaandorp2/data/FLUXNET/FLX_%s_FLUXNET2015_FULLSET_DD_*.csv'%(flx_name))[0]
+            file_pattern = os.path.join(self.folder_FLX, 'FLX_%s_FLUXNET2015_FULLSET_DD_*.csv' % flx_name)
+            file = glob(file_pattern)[0]
             flx_data = pd.read_csv(file,parse_dates=[date_column])
 
             # check if the lon/lat fall within the domain

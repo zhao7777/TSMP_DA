@@ -5,10 +5,10 @@ import os
 from helpers import bin_dates_by_restart_dates, date_range_noleap
 
 # Below, import the parameter setup/generation functions that you defined 
-from setup_parameters import setup_sandfrac_anom, setup_clayfrac_anom, setup_orgfrac_anom, setup_medlyn_slope, setup_medlyn_intercept, setup_medlyn_slope_v2, setup_medlyn_intercept_v2, setup_fff, setup_orgmax, setup_orgmax_v2
+from setup_parameters import setup_sandfrac_anom, setup_clayfrac_anom, setup_orgfrac_anom, setup_medlyn_slope, setup_medlyn_intercept, setup_medlyn_slope_v2, setup_medlyn_intercept_v2, setup_fff, setup_orgmax, setup_orgmax_v2,setup_d_max
 from setup_parameters import setup_om_hydraulic, setup_h2o_canopy_max, setup_kmax, setup_kmax_v2, setup_mineral_hydraulic, setup_luna
 
-from generate_parameters import generate_sandfrac_anom, generate_clayfrac_anom, generate_orgfrac_anom, generate_medlyn_slope, generate_medlyn_intercept, generate_medlyn_slope_v2, generate_medlyn_intercept_v2, generate_fff, generate_orgmax, generate_orgmax_v2
+from generate_parameters import generate_sandfrac_anom, generate_clayfrac_anom, generate_orgfrac_anom, generate_medlyn_slope, generate_medlyn_intercept, generate_medlyn_slope_v2, generate_medlyn_intercept_v2, generate_fff, generate_orgmax, generate_orgmax_v2,generate_d_max
 from generate_parameters import generate_om_hydraulic, generate_h2o_canopy_max, generate_kmax, generate_kmax_v2, generate_mineral_hydraulic, generate_luna
 
 # some old parflow functions that are not used anymore, but can be useful in the future
@@ -34,21 +34,21 @@ nz = 30 #30 for eCLM, 15 for CLM3.5
 
 settings_run={'models': 'eCLM', #model components to include ('eCLM' or 'CLM3.5-PFL', rest to be done..)
               'mode': 'DA', #Open Loop (OL), or with DA (adjust settings_DA, settings_gen)
-              'dir_forcing':'/p/scratch/cjibg36/kaandorp2/data/ERA5_EUR-11_CLM_v2', #folder containing CLM forcing files
-              'dir_setup':'/p/scratch/cjibg36/kaandorp2/TSMP_results/eTSMP/DA_test_clean_v1', #folder in which the case will be run
-              'dir_build':'/p/project/cjibg36/kaandorp2/eCLM_params/', #required for parflow files
-              'dir_binaries':'/p/project/cjibg36/kaandorp2/eCLM_params/eclm/bin/', #folder from which parflow/clm binaries are to be copied
-              'dir_template':'/p/project/cjibg36/kaandorp2/eTSMP_setups/setup_eclm_cordex_444x432_v8/', #folder containing all clm/pfl/oasis/namelist files, where everything with 2 underscores (__variable__) needs to be filled out 
+              'dir_forcing':'/p/project/cjibg36/jibg3674/shared_DA/ERA5_EUR-11_CLM', #folder containing CLM forcing files
+              'dir_setup':'/p/scratch/cjibg36/jibg3674/CLM5_DA/small_test_d_max', #folder in which the case will be run
+              'dir_build':'/p/project/cjibg36/jibg3674/eCLM/', #required for parflow files
+              'dir_binaries':'/p/project/cjibg36/jibg3674/eCLM/eclm/bin/', #folder from which parflow/clm binaries are to be copied
+              'dir_template':'/p/project/cjibg36/jibg3674/shared_DA/setup_eclm_cordex_444x432_v9/', #folder containing all clm/pfl/oasis/namelist files, where everything with 2 underscores (__variable__) needs to be filled out 
               'spinup':False, # integer (how many times to repeat the interval from date_start to date_end) or set to False
               'init_restart':True, #Set to true if you have initial restart files available for CLM/PFL, and set them correctly in the 2 lines below
-              'env_file':'/p/project/cjibg36/kaandorp2/eTSMP/env/jsc.2023_Intel.sh', # file containing modules, os.path.join(dir_build,'bldsva/machines/JUWELS/loadenvs.Intel'
+              'env_file':'/p/project/cjibg36/jibg3674/eCLM/jsc.2023_Intel.sh', # file containing modules, os.path.join(dir_build,'bldsva/machines/JUWELS/loadenvs.Intel'
               'files_remove':[],
               'ndays_spinup':ndays_spinup,
               'ndays_validation':ndays_validation,
               'remove_hist_files':['h1','h2']} #set to None, or one of the history filestream names if they are to be removed
 
 # Initial condition files for CLM/PFL
-IC_file_CLM = '/p/scratch/cjibg36/kaandorp2/TSMP_results/eTSMP/OL_eclm_cordex_444x432/R000/run_009_20180101-20190101/EU11.clm2.r.2019-01-01-00000.nc'
+IC_file_CLM = '/p/project/cjibg36/jibg3674/shared_DA/EU11.clm2.r.2019-01-01-00000.nc'
 IC_file_ParFlow = False
 
 # SLURM settings. At the moment there is 1 CLM simulation per node, parflow settings are ignored when running CLM only.
@@ -64,25 +64,13 @@ sbatch_check_sec = 60*5 #check every n seconds if the simulation is done
 
 
 #---Options for the Data Assimilation
-settings_DA={'param_setup':[setup_orgmax_v2, setup_fff,setup_h2o_canopy_max,
-                            setup_mineral_hydraulic,setup_om_hydraulic,
-                            setup_kmax_v2,setup_medlyn_slope_v2,setup_medlyn_intercept_v2,setup_luna,
-                            setup_sandfrac_anom, setup_clayfrac_anom, setup_orgfrac_anom ],
-             'param_gen':[generate_orgmax_v2, generate_fff,generate_h2o_canopy_max,
-                          generate_mineral_hydraulic,generate_om_hydraulic,
-                          generate_kmax_v2,generate_medlyn_slope_v2,generate_medlyn_intercept_v2,generate_luna,
-                          generate_sandfrac_anom, generate_clayfrac_anom, generate_orgfrac_anom ],
-             'param_names':['orgmax_v2','fff','h2o_canopy_max',
-                            'mineral_hydraulic','om_hydraulic',
-                            'kmax_v2','medlyn_slope_v2','medlyn_intercept_v2','luna',
-                            'sandfrac_anom', 'clayfrac_anom', 'orgfrac_anom'],
-             'param_r_loc':[np.nan, np.nan, np.nan,
-                            np.nan, np.nan,
-                            np.nan, np.nan, np.nan, np.nan,
-                            12.500*16,12.500*16,12.500*16], #localisation radius in km
-             'n_parallel':4,  # set to n_ensemble+1 for full efficiency
+settings_DA={'param_setup':[setup_d_max],
+             'param_gen':[setup_d_max],
+             'param_names':['d_max'],
+             'param_r_loc':[np.nan], #localisation radius in km
+             'n_parallel':8,  # set to n_ensemble+1 for full efficiency
              'n_parallel_setup':4, # setup is done on login node, limit the nr of processes
-             'n_ensemble':3,
+             'n_ensemble':7,
              'n_iter':2,
              'last_iter_ML_only':False, #evaluate most likely parameter set for last iteration only (not entire ensemble)
              'data_names':['SMAP','FLX'], #which datasets to assimilate
@@ -94,11 +82,11 @@ settings_DA={'param_setup':[setup_orgmax_v2, setup_fff,setup_h2o_canopy_max,
              'loc_type':'distance', #type of localisation applied; POL or distance (set param_r_loc). POL does not seem to work better at first sight
              'dzeta_global':.4, #tapering factor
              'POL_eps':.8, #epsilon when using POL localization
-             'cutoff_svd':.9, # discard small singular values, smaller = more discarding
-             'file_lsm':'/p/project/cjibg36/kaandorp2/TSMP_setups/static/EUR-11_TSMP_FZJ-IBG3_444x432_LAND-LAKE-SEA-MASK.nc',
-             'file_corner':'/p/project/cjibg36/kaandorp2/TSMP_setups/static/EUR-11_444x432_corners_curvi_Tair.nc',
-             'folder_SMAP':'/p/scratch/cjibg36/kaandorp2/data/SMAP/',
-             'folder_FLX':'/p/scratch/cjibg36/kaandorp2/data/FLUXNET'} 
+             'cutoff_svd':1, # discard small singular values, smaller = more discarding
+             'file_lsm':'/p/project/cjibg36/jibg3674/shared_DA/static/EUR-11_TSMP_FZJ-IBG3_444x432_LAND-LAKE-SEA-MASK.nc',
+             'file_corner':'/p/project/cjibg36/jibg3674/shared_DA/static/EUR-11_444x432_corners_curvi_Tair.nc',
+             'folder_SMAP':'/p/project/cjibg36/jibg3674/shared_DA/SMAP/',
+             'folder_FLX':'/p/project/cjibg36/jibg3674/shared_DA/ICOS/'} 
 
 # settings required for the parameter generation in setup_parameters and generate_parameters
 settings_gen = {'dir_clm_surf':os.path.join(settings_run['dir_setup'],'input_clm'),
@@ -181,7 +169,7 @@ settings_clm = {'t_dump':time_dump,
                 'n_proc_clm':n_proc_clm,
                 'IC_file':IC_file_CLM,
                 'init_interp':False, #eCLM option: interpolate the restart file. Must be true when going from eCLM only to eCLM/ParFlow runs, or runs with different masks
-                'dir_common_eclm':'/p/project/cjibg36/kaandorp2/eTSMP_setups/common_eclm_files',
+                'dir_common_eclm':'/p/project/cjibg36/jibg3674/shared_DA/common_eclm_files',
                 'param_names':settings_DA['param_names']} #eCLM option: avoid copying many large files
 
 settings_pfl = {'t_dump':time_dump,
