@@ -252,7 +252,8 @@ def setup_fff(settings_setup,settings_run):
     
 def setup_d_max(settings_setup,settings_run):
     '''
-    the d_max, Dry surface layer (DSL) parameter :mm
+    the d_max, Dry surface layer (DSL) parameter :mm 
+    ref: Dagon et al. (2020)
     '''
     dir_out = settings_run['dir_DA']
     val_min = np.log10(10) 

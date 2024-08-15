@@ -5,10 +5,10 @@ import os
 from helpers import bin_dates_by_restart_dates, date_range_noleap
 
 # Below, import the parameter setup/generation functions that you defined 
-from setup_parameters import setup_sandfrac_anom, setup_clayfrac_anom, setup_orgfrac_anom, setup_medlyn_slope, setup_medlyn_intercept, setup_medlyn_slope_v2, setup_medlyn_intercept_v2, setup_fff, setup_orgmax, setup_orgmax_v2,setup_d_max
+from setup_parameters import setup_sandfrac_anom, setup_clayfrac_anom, setup_orgfrac_anom, setup_medlyn_slope, setup_medlyn_intercept, setup_medlyn_slope_v2, setup_medlyn_intercept_v2, setup_fff, setup_orgmax, setup_orgmax_v2
 from setup_parameters import setup_om_hydraulic, setup_h2o_canopy_max, setup_kmax, setup_kmax_v2, setup_mineral_hydraulic, setup_luna
 
-from generate_parameters import generate_sandfrac_anom, generate_clayfrac_anom, generate_orgfrac_anom, generate_medlyn_slope, generate_medlyn_intercept, generate_medlyn_slope_v2, generate_medlyn_intercept_v2, generate_fff, generate_orgmax, generate_orgmax_v2,generate_d_max
+from generate_parameters import generate_sandfrac_anom, generate_clayfrac_anom, generate_orgfrac_anom, generate_medlyn_slope, generate_medlyn_intercept, generate_medlyn_slope_v2, generate_medlyn_intercept_v2, generate_fff, generate_orgmax, generate_orgmax_v2
 from generate_parameters import generate_om_hydraulic, generate_h2o_canopy_max, generate_kmax, generate_kmax_v2, generate_mineral_hydraulic, generate_luna
 
 # some old parflow functions that are not used anymore, but can be useful in the future
@@ -24,7 +24,7 @@ date_end = datetime(2019,6,1,20,0,0)
 freq_output = '3d'#'3d' 
 freq_iter = 1 # int or string, e.g. 'AS','3MS','AS-MAY'  Set this to 1. The idea is that this allows for running the updates (iterative smoother) sequentially. For this the 'date loop' in main_DA needs to be implemented
 freq_restart = 1 # int or string, e.g. '7d','AS','MS' This can be set to e.g. 2 in the case of long simulations, to keep the simulation time below the maximum slurm walltime of 1 day, by breaking the simulation into 2 parts
-ndays_spinup = 3*30 #3*30 # spinup in days. Set to multiple of freq_output! or to None
+ndays_spinup = 2*30 #3*30 # spinup in days. Set to multiple of freq_output! or to None
 ndays_validation = 30# 12*30 # after parameter calibration, run for n days to check validation data
 
 time_couple = timedelta(seconds=3600) # coupling (CLM-PFL), don't change this - or check coup_oas.tcl carefully (e.g. baseunit) - pfl units are in hours
@@ -32,12 +32,15 @@ nx = 444 #number of gridpoints
 ny = 432 
 nz = 30 #30 for eCLM, 15 for CLM3.5
 
+
 settings_run={'models': 'eCLM', #model components to include ('eCLM' or 'CLM3.5-PFL', rest to be done..)
               'mode': 'DA', #Open Loop (OL), or with DA (adjust settings_DA, settings_gen)
               'dir_forcing':'/p/project/cjibg36/jibg3674/shared_DA/ERA5_EUR-11_CLM', #folder containing CLM forcing files
-              'dir_setup':'/p/scratch/cjibg36/jibg3674/CLM5_DA/small_test_d_max', #folder in which the case will be run
-              'dir_build':'/p/project/cjibg36/jibg3674/eCLM/', #required for parflow files
-              'dir_binaries':'/p/project/cjibg36/jibg3674/eCLM/eclm/bin/', #folder from which parflow/clm binaries are to be copied
+              'atm_perb': True,
+              'dir_noise': '/p/project/cjibg36/jibg3674/shared_DA/ERA5_EUR-11_CLM/noise', # folder containing forcing noise
+              'dir_setup':'/p/scratch/cjibg36/jibg3674/CLM5_DA/small_test_ap', #folder in which the case will be run
+              'dir_build':'/p/project1/cjibg36/jibg3674/eCLM_PyDA/eCLM/', #required for parflow files
+              'dir_binaries':'/p/project1/cjibg36/jibg3674/eCLM_PyDA/eCLM/eclm/bin/', #folder from which parflow/clm binaries are to be copied
               'dir_template':'/p/project/cjibg36/jibg3674/shared_DA/setup_eclm_cordex_444x432_v9/', #folder containing all clm/pfl/oasis/namelist files, where everything with 2 underscores (__variable__) needs to be filled out 
               'spinup':False, # integer (how many times to repeat the interval from date_start to date_end) or set to False
               'init_restart':True, #Set to true if you have initial restart files available for CLM/PFL, and set them correctly in the 2 lines below
@@ -59,18 +62,30 @@ n_proc_pfl_z = 1
 n_proc_clm = 48 #12,15,23,48,63
 sbatch_account = 'jibg36'
 sbatch_partition = 'devel' #batch or devel (for short <1h runs)
-sbatch_time = '0-01:00:00' #1-00:00:00 
+sbatch_time = '00:30:00' #1-00:00:00 
 sbatch_check_sec = 60*5 #check every n seconds if the simulation is done
 
 
 #---Options for the Data Assimilation
-settings_DA={'param_setup':[setup_d_max],
-             'param_gen':[setup_d_max],
-             'param_names':['d_max'],
-             'param_r_loc':[np.nan], #localisation radius in km
-             'n_parallel':8,  # set to n_ensemble+1 for full efficiency
-             'n_parallel_setup':4, # setup is done on login node, limit the nr of processes
-             'n_ensemble':7,
+settings_DA={'param_setup':[setup_orgmax_v2, setup_fff,setup_h2o_canopy_max,
+                            setup_mineral_hydraulic,setup_om_hydraulic,
+                            setup_kmax_v2,setup_medlyn_slope_v2,setup_medlyn_intercept_v2,setup_luna,
+                            setup_sandfrac_anom, setup_clayfrac_anom, setup_orgfrac_anom ],
+             'param_gen':[generate_orgmax_v2, generate_fff,generate_h2o_canopy_max,
+                          generate_mineral_hydraulic,generate_om_hydraulic,
+                          generate_kmax_v2,generate_medlyn_slope_v2,generate_medlyn_intercept_v2,generate_luna,
+                          generate_sandfrac_anom, generate_clayfrac_anom, generate_orgfrac_anom ],
+             'param_names':['orgmax_v2','fff','h2o_canopy_max',
+                            'mineral_hydraulic','om_hydraulic',
+                            'kmax_v2','medlyn_slope_v2','medlyn_intercept_v2','luna',
+                            'sandfrac_anom', 'clayfrac_anom', 'orgfrac_anom'],
+             'param_r_loc':[np.nan, np.nan, np.nan,
+                            np.nan, np.nan,
+                            np.nan, np.nan, np.nan, np.nan,
+                            12.500*16,12.500*16,12.500*16], #localisation radius in km
+             'n_parallel':4,  # set to n_ensemble+1 for full efficiency
+             'n_parallel_setup':1, # setup is done on login node, limit the nr of processes
+             'n_ensemble':3,
              'n_iter':2,
              'last_iter_ML_only':False, #evaluate most likely parameter set for last iteration only (not entire ensemble)
              'data_names':['SMAP','FLX'], #which datasets to assimilate
@@ -82,9 +97,9 @@ settings_DA={'param_setup':[setup_d_max],
              'loc_type':'distance', #type of localisation applied; POL or distance (set param_r_loc). POL does not seem to work better at first sight
              'dzeta_global':.4, #tapering factor
              'POL_eps':.8, #epsilon when using POL localization
-             'cutoff_svd':1, # discard small singular values, smaller = more discarding
-             'file_lsm':'/p/project/cjibg36/jibg3674/shared_DA/static/EUR-11_TSMP_FZJ-IBG3_444x432_LAND-LAKE-SEA-MASK.nc',
-             'file_corner':'/p/project/cjibg36/jibg3674/shared_DA/static/EUR-11_444x432_corners_curvi_Tair.nc',
+             'cutoff_svd':.9, # discard small singular values, smaller = more discarding
+             'file_lsm':'/p/project/cjibg36/jibg3674/shared_DA/EUR-11_TSMP_FZJ-IBG3_444x432_LAND-LAKE-SEA-MASK.nc',
+             'file_corner':'/p/project/cjibg36/jibg3674/shared_DA/EUR-11_444x432_corners_curvi_Tair.nc',
              'folder_SMAP':'/p/project/cjibg36/jibg3674/shared_DA/SMAP/',
              'folder_FLX':'/p/project/cjibg36/jibg3674/shared_DA/ICOS/'} 
 
