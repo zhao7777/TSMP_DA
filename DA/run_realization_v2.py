@@ -74,7 +74,7 @@ def adjust_clm_files(dir_setup,dir_run,settings_clm):
 def adjust_eclm_files(settings_run,dir_run,dir_real,settings_clm):
     dir_setup = settings_run['dir_setup']
     files_modelio = glob(os.path.join(dir_setup,'input_clm/*modelio.nml') )
-    files_stream_t = glob(os.path.join(dir_setup,'input_clm/*streams*') )
+    files_stream_t = glob(os.path.join(dir_setup,'input_clm/*streams.txt*') )
 
     if 'PFL' in settings_run['models']: #TODO: check why different domain/surface files are required when including ParFlow...
         filename_domain = 'domain.lnd.EUR-11_EUR-11.230216_landfrac.nc' 
@@ -87,10 +87,7 @@ def adjust_eclm_files(settings_run,dir_run,dir_real,settings_clm):
         filename_domain = 'domain.lnd.EUR-11_EUR-11.230216_mask.nc'
         filename_landfrac = 'domain.lnd.EUR-11_EUR-11.230216_mask.nc'
         filename_surf = 'surfdata_EUR-11_hist_16pfts_Irrig_CMIP6_simyr2000_c230808_GLC2000.nc'
-        # filename_domain = 'domain.lnd.EUR-11_EUR-11.230216_landfrac.nc'
-        # filename_landfrac = 'domain.lnd.EUR-11_EUR-11.230216_landfrac.nc'
-        # filename_surf = 'surfdata_EUR-11_hist_16pfts_Irrig_CMIP6_simyr2000_c230808_GLC2000.nc'
-    
+
     #IF a parameter from the surface file needs to be assimilated, the surfdata_*.nc is located inside of the realization directory
     if any(i in all_clm_surfparameters for i in settings_clm['param_names']): 
         dir_surf = dir_real
@@ -165,7 +162,8 @@ def adjust_eclm_files(settings_run,dir_run,dir_real,settings_clm):
         with open(os.path.join(dir_run,os.path.basename(file_)), 'w') as file:
           file.write(filedata)
         os.chmod(os.path.join(dir_run,os.path.basename(file_)),0o755) # read/execute permissions for all
-        
+    
+    
         
     ### Adjust datm_in
     file_ = os.path.join(dir_setup,'input_clm/datm_in')
@@ -256,6 +254,61 @@ def adjust_eclm_files(settings_run,dir_run,dir_real,settings_clm):
 
     ## copy mosart namelist
     shutil.copyfile(os.path.join(dir_setup,'input_clm/mosart_in'), os.path.join(dir_run,'mosart_in'))
+
+    
+def adjust_eclm_noise_files(settings_run,dir_run,i_real,settings_clm,n_ensemble):
+    dir_setup = settings_run['dir_setup']
+    files_stream_n = glob(os.path.join(dir_setup,'input_clm/*streams*noise*') )   
+    
+    date_min = datetime(settings_clm['datetime_start'].year,settings_clm['datetime_start'].month,1)
+    date_max = datetime(settings_clm['datetime_end'].year,settings_clm['datetime_end'].month,1)
+    dates_files = pd.date_range(date_min,date_max,freq='MS')
+    
+    filename_domain = 'domain.lnd.EUR-11_EUR-11.230216_mask.nc'
+    
+    list_files = ''
+    for i1,date_ in enumerate(dates_files):
+        list_files += '      %4.4i-%2.2i.nc' % (date_.year,date_.month)
+        if i1 < len(dates_files)-1:
+            list_files += '\n'
+
+    for file_ in files_stream_n:
+        with open(file_, 'r') as file :
+          filedata = file.read()
+
+        filedata = filedata.replace('__path_in_clm__', '%s'% os.path.join(dir_setup,'input_clm') )
+        filedata = filedata.replace('__path_common_clm__', '%s'% settings_clm['dir_common_eclm'] )
+        filedata = filedata.replace('__path_noise__', '%s'% settings_run['dir_noise'] )
+        filedata = filedata.replace('__list_filenames__', '%s'% list_files )
+        filedata = filedata.replace('__file_domain__', '%s'% filename_domain )
+        filedata = filedata.replace('__case_id___', '{}'.format(i_real - 1))
+        filedata = filedata.replace('__num_of_ens___', '{}'.format(n_ensemble))        
+
+        with open(os.path.join(dir_run,os.path.basename(file_)), 'w') as file:
+          file.write(filedata)
+        os.chmod(os.path.join(dir_run,os.path.basename(file_)),0o755) # read/execute permissions for all
+        
+    ## add the noise files to the datm_in
+    file_ = os.path.join(dir_setup,'input_clm/datm_in')
+    with open(file_, 'r') as file :
+      filedata = file.read()
+    
+    add_lines = (
+    f"\n           'datm.streams.solar_noise.stream {date_min.year} {date_min.year} {date_max.year}'",
+    f"\n           'datm.streams.precip_noise.stream {date_min.year} {date_min.year} {date_max.year}'",
+    f"\n           'datm.streams.other_noise.stream {date_min.year} {date_min.year} {date_max.year}'"
+    )
+
+    # Find the position to insert the new streams
+    match = re.search(r"streams = (.*?)(\s*taxmode)", content, re.DOTALL)
+    if match:
+        before_streams = match.group(1)
+        after_streams = match.group(2)
+        new_content = content.replace(before_streams, before_streams + new_streams_lines)
+
+    with open(os.path.join(dir_run,os.path.basename(file_)), 'w') as file:
+      file.write(filedata)
+    os.chmod(os.path.join(dir_run,os.path.basename(file_)),0o755) # read/execute permissions for all
 
     
 def adjust_parflow_files(dir_setup,dir_run,dir_build,dir_bin,dir_real,settings_pfl):
@@ -355,7 +408,8 @@ def make_parflow_executable(dir_run,settings_run):
            os.path.join(dir_run,'ascii2pfb_poros.tcl'))
 
     os.system(str_cmd)    
-
+    
+    
 def adjust_oasis_files(dir_run,settings_run,settings_clm,settings_pfl):
     
     dir_setup = settings_run['dir_setup']
@@ -525,7 +579,7 @@ def remove_misc_files(dir_run,settings_run):
                 # print(os.path.join(dir_run,file_))
                 os.remove(os.path.join(dir_run,file_))              
     
-def setup_submit_wait(i_real,settings_run,settings_clm,settings_pfl,settings_sbatch,date_results_iter):
+def setup_submit_wait(i_real,settings_run,settings_clm,settings_pfl,settings_sbatch,date_results_iter,n_ensemble):
     # print('Sleeping %i seconds' % i_real)
     # time.sleep(i_real)
     
@@ -619,6 +673,11 @@ def setup_submit_wait(i_real,settings_run,settings_clm,settings_pfl,settings_sba
                     settings_clm['datetime_start'] = date_start_sim
                     settings_clm['datetime_end'] = date_end_sim
                     adjust_eclm_files(settings_run,dir_run,dir_real,settings_clm)
+                    
+                    if atm_perb is True and i_real != 0 and i_real != n_ensemble - 1:                    
+                        adjust_eclm_noise_files(settings_run,dir_run,i_real,settings_clm,n_ensemble)
+                    else:
+                        pass
                 else: #CLM3.5-PFL
                     settings_clm['t_total'] = date_end_sim-date_start_sim
                     settings_clm['datetime_start'] = date_start_sim
@@ -669,7 +728,6 @@ def setup_submit_wait(i_real,settings_run,settings_clm,settings_pfl,settings_sba
             
 if __name__ == '__main__':
     
-    settings_run['dir_real'] = '/p/scratch/cjibg36/kaandorp2/TSMP_results/TSMP_patched/DA_tsmp_cordex_111x108/20190102-20191231/i000/R000'
     date_results_iter = date_results_binned[0]
     
     setup_submit_wait(settings_run,settings_clm,settings_pfl,settings_sbatch,date_results_iter)
