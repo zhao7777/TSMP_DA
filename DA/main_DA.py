@@ -39,29 +39,40 @@ def realize_parameters(i_real,settings_gen,settings_run,init=True,run_prior=Fals
     dir_real = os.path.join(settings_run['dir_iter'],'R%3.3i'%i_real)
     local_state = np.random.RandomState() #required for parallel processes in python
     dir_DA = settings_run['dir_DA']
+    
+    load_para = settings_run['load_para']
+    dir_para = settings_run['dir_para']
 
     if not os.path.exists(dir_real):
         print('Creating parameter realizations for ensemble member %i' % i_real)
         print('Creating folder for realization %i: %s' % (i_real,dir_real), flush=True )
         os.mkdir(dir_real)
-        time.sleep(1) #probably unnecessary, had some troubles with deadlocks..
+        time.sleep(1)
         
         if init:
             print('Initializing parameters from prior parameter settings')
             i_iter_ = 0 #prior parameters are always read from the initial iteration file
-            # Read parameter values + std, generate parameter realizations (i_real)
-            for p_name, p_fn_gen in zip(settings_gen['param_names'],settings_gen['param_gen']):
-                p_values = np.load(os.path.join(dir_DA,'%s.param.%3.3i.%3.3i.prior.npy'% (p_name,settings_gen['i_date'],i_iter_) ))
-                p_mean = p_values[:,0]
-                p_sigma = p_values[:,1]
+            
+            if not load_para:
+                # Read parameter values + std, generate parameter realizations (i_real)     
+                for p_name, p_fn_gen in zip(settings_gen['param_names'],settings_gen['param_gen']):
+                    p_values = np.load(os.path.join(dir_DA,'%s.param.%3.3i.%3.3i.prior.npy'% (p_name,settings_gen['i_date'],i_iter_) ))
+                    p_mean = p_values[:,0]
+                    p_sigma = p_values[:,1]
+
+                    # ensemble member 0: most likely parameter values are used
+                    if i_real == 0 or run_prior:
+                        p_real = p_mean.copy()
+                    else:
+                        p_real = local_state.normal(p_mean,p_sigma)
+                    np.save(os.path.join(dir_DA,'%s.param.%3.3i.%3.3i.%3.3i'%(p_name,settings_gen['i_date'],settings_gen['i_iter'],i_real)),p_real)
+                    p_fn_gen(i_real,settings_gen,settings_run)
+            else:
+                # Load previous parameters configuration
+                for p_name, p_fn_gen in zip(settings_gen['param_names'],settings_gen['param_gen']):
+                    shutil.copyfile(os.path.join(dir_para, '%s.param.%3.3i.%3.3i.%3.3i.npy'%(p_name,settings_gen['i_date'],settings_gen['i_iter'],i_real)), os.path.join(dir_DA,'%s.param.%3.3i.%3.3i.%3.3i.npy'%(p_name,settings_gen['i_date'],settings_gen['i_iter'],i_real)))
+                    p_fn_gen(i_real,settings_gen,settings_run)
                 
-                # ensemble member 0: most likely parameter values are used
-                if i_real == 0 or run_prior:
-                    p_real = p_mean.copy()
-                else:
-                    p_real = local_state.normal(p_mean,p_sigma)
-                np.save(os.path.join(dir_DA,'%s.param.%3.3i.%3.3i.%3.3i'%(p_name,settings_gen['i_date'],settings_gen['i_iter'],i_real)),p_real)
-                p_fn_gen(i_real,settings_gen,settings_run)
         else:
             print('Updating parameters from DA analysis')
             for p_name, p_fn_gen in zip(settings_gen['param_names'],settings_gen['param_gen']):
@@ -581,13 +592,30 @@ if __name__ == '__main__':
     # directory containing all the DA information: parameter prior values and their values for each ensemble member
     dir_DA = os.path.join(dir_setup,'input_DA')
     settings_run['dir_DA'] = dir_DA
+    load_para = settings_run['load_para']
+    dir_para = settings_run['dir_para']
     if not os.path.exists(dir_DA):
         print('Creating folder to store DA information: %s' % (dir_DA) )
         os.mkdir(dir_DA)
 
-        # setup parameters: set the prior/uncertainties, + static properties, lon/lat locations based on the settings if necessary
-        for fn in param_setup:
-            fn(settings_gen,settings_run)
+        # setup parameters: prior/uncertainties, + static properties, lon/lat locations based on the settings if necessary
+        if not load_para:
+            for fn in param_setup:
+                fn(settings_gen,settings_run)
+        else:
+            print('Applying a set of parameters used in a prior setup ')
+            for p_name in (settings_DA['param_names']):
+                    shutil.copyfile(os.path.join(dir_para, '%s.param.000.000.prior.npy'% (p_name)),
+                                    os.path.join(dir_DA,'%s.param.000.000.prior.npy'% (p_name)))
+                    if p_name in ['sandfrac_anom', 'clayfrac_anom', 'orgfrac_anom']:
+                        try:
+                            shutil.copyfile(os.path.join(dir_para, '%s.static.npy'% (p_name)),
+                                            os.path.join(dir_DA,'%s.static.npy'% (p_name)))
+                            shutil.copyfile(os.path.join(dir_para, '%s.latlon.npy'% (p_name)),
+                                            os.path.join(dir_DA,'%s.latlon.npy'% (p_name)))
+                        except Exception as e:
+                            print('The dir_para does not contain the static file ...')
+
 
     # Read parameter length and put in dictionary here
     for param_ in param_names:
@@ -673,7 +701,7 @@ if __name__ == '__main__':
             # Parallel submission -> if using single site perhaps make a single job script, using 1 node instead of many
             with mp.Pool(processes=n_parallel) as pool:
                 pool.starmap(setup_submit_wait, zip(np.arange(0,n_ensemble+1),repeat(settings_run),repeat(settings_clm),
-                                                   repeat(settings_pfl),repeat(settings_sbatch),repeat(date_results_iter)) )
+                                                   repeat(settings_pfl),repeat(settings_sbatch),repeat(date_results_iter),repeat(n_ensemble)) )
             
             n_ensemble, reread_required = check_for_success(dir_iter,dir_DA,dir_settings,date_results_iter,n_ensemble)
             if reread_required:
@@ -789,8 +817,8 @@ if __name__ == '__main__':
         realize_parameters(i_real,settings_gen,settings_run,init=init_list[i_],run_prior=run_prior[i_])
 
     with mp.Pool(processes=n_parallel+1) as pool:
-        pool.starmap(setup_submit_wait, zip(list_i_real,repeat(settings_run),repeat(settings_clm),
-                                           repeat(settings_pfl),repeat(settings_sbatch),repeat(date_results_iter)) )
+        pool.starmap(setup_submit_wait, zip(np.arange(0,n_ensemble+1),repeat(settings_run),repeat(settings_clm),
+                                                   repeat(settings_pfl),repeat(settings_sbatch),repeat(date_results_iter),repeat(n_ensemble)))
 
     # n_ensemble, reread_required = check_for_success(dir_iter,dir_DA,dir_settings,date_results_iter,n_ensemble)
     # if reread_required:

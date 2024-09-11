@@ -180,7 +180,7 @@ class operator_clm_SMAP:
             self.files_clm[date_] = file_clm
             
             # file_clm = sorted(glob(os.path.join(settings_run['dir_iter'],'R%3.3i/**/clm.clm2.h0.*.nc'%i_real)))[i1]
-            # print(date_,file_clm)
+            print(date_,file_clm)
             
             data_TSMP = xr.open_dataset(file_clm)
             # add curvilinear lon/lat 

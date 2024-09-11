@@ -295,7 +295,7 @@ def adjust_eclm_noise_files(settings_run,dir_run,i_real,settings_clm,n_ensemble)
       filedata = file.read()
     
     add_lines = (
-    f",\n           'datm.streams.solar_noise.stream {date_min.year} {date_min.year} {date_max.year}'",
+    f"\n           'datm.streams.solar_noise.stream {date_min.year} {date_min.year} {date_max.year}'",
     f",\n           'datm.streams.precip_noise.stream {date_min.year} {date_min.year} {date_max.year}'",
     f",\n           'datm.streams.other_noise.stream {date_min.year} {date_min.year} {date_max.year}'"
     )
@@ -505,7 +505,7 @@ def start_run(settings_run):
     dir_build = settings_run['dir_build']
     
     str_cmd = '''
-    source %s
+    source %s  > /dev/null 2>&1
     sbatch %s
     ''' % (settings_run['env_file'],
            sbatch_file)
@@ -546,8 +546,8 @@ def move_and_link(to_link,folder_store,delete_existing=True):
 def remove_misc_files(dir_run,settings_run):
     # [os.remove(file) for file in glob(os.path.join(dir_run,'CLMSAT*.nc'))]
     # Keep all output files
-    retain = ['mpiMPMD*','cordex*.out.0*','*.clm2.h[0-2].*.nc','coup_oas*','lnd*','ready*',
-             'timing','log','*slm*']
+    retain = ['mpiMPMD*','cordex*.out.0*','*.clm2.h[0-2].*.nc','coup_oas*','lnd*','ready*','datm*','*_in',
+              'timing','log','*slm*', '*nml']
     # remove = ['*.clm2.h0.2019-0[1-5]*.nc']
     # remove = ['bladiebla']
     remove = settings_run['files_remove']
@@ -711,7 +711,7 @@ def setup_submit_wait(i_real,settings_run,settings_clm,settings_pfl,settings_sba
                     settings_run_['files_remove'].append('*.clm2.h[0-2].*.nc')
                 else:
                     settings_run_ = copy.deepcopy(settings_run)
-                # remove_misc_files(dir_run,settings_run_)
+                remove_misc_files(dir_run,settings_run_)
 
                 # ## Last step: move the run directory to storage (scratch), and keep a link
                 # if not os.path.exists(settings_run['dir_store']):
