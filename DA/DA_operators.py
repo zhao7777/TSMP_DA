@@ -77,6 +77,24 @@ def unpackbits(x, num_bits):
     mask = 2**np.arange(num_bits, dtype=x.dtype).reshape([1, num_bits])
     return (x & mask).astype(bool).astype(int).reshape(xshape + [num_bits])
 
+def combine_dd(a, b):
+    # Condition 1: Both arrays have values, take the average
+    both_valid = ~np.isnan(a) & ~np.isnan(b)
+    result = np.full(a.shape, np.nan)  # Initialize with NaNs
+    result[both_valid] = (a[both_valid] + b[both_valid]) / 2
+    
+    only_a_valid = ~np.isnan(a) & np.isnan(b)
+    result[only_a_valid] = a[only_a_valid]
+    
+    only_b_valid = np.isnan(a) & ~np.isnan(b)
+    result[only_b_valid] = b[only_b_valid]    
+    return result
+
+def drop_nan_and_flatten(arr):
+    flattened = arr.ravel()  
+    non_nan_values = flattened[~np.isnan(flattened)]
+    return non_nan_values
+
 class operator_clm_SMAP:
     
     def __init__(self,file_lsm,file_corner,folder_SMAP,ignore_rivers=False):
@@ -93,7 +111,7 @@ class operator_clm_SMAP:
         return y_out
         
     def get_measurements(self,date_results_iter,date_DA_start=datetime(1900,1,1),date_DA_end=datetime(2200,1,1),
-                         mode='pm',qual_level=1,return_latlon=False,return_date=False,max_deviation_time=timedelta(days=1)):
+                         mode='dd',qual_level=1,return_latlon=False,return_date=False,max_deviation_time=timedelta(days=1)):
         self.lons_out = {}
         self.lats_out = {}
         self.sm_out = {}
@@ -138,7 +156,28 @@ class operator_clm_SMAP:
                             # 5) Select valid points: valid data, and within the given TSMP domain
                             sm = data_SMAP_pm.soil_moisture_pm.where(mask_data_valid).values[mask_data_valid]
                             lons = data_SMAP_pm.longitude_pm.where(mask_data_valid).values[mask_data_valid]
-                            lats = data_SMAP_pm.latitude_pm.where(mask_data_valid).values[mask_data_valid]                            
+                            lats = data_SMAP_pm.latitude_pm.where(mask_data_valid).values[mask_data_valid]       
+                        elif mode == 'dd':
+                            mask_data_valid = ~np.isnan(data_SMAP_am.soil_moisture) & ~np.isnan(data_SMAP_am.longitude)
+                            if qual_level > 0:
+                                qual_flags = unpackbits(data_SMAP_am.retrieval_qual_flag.values.astype(int),4)
+                                mask_data_valid = mask_data_valid & (qual_flags[:,:,0]==0)
+                            sm_am = data_SMAP_am.soil_moisture.where(mask_data_valid)
+                            lons_am = data_SMAP_am.longitude.where(mask_data_valid)
+                            lats_am = data_SMAP_am.latitude.where(mask_data_valid)
+                            mask_data_valid = ~np.isnan(data_SMAP_pm.soil_moisture_pm) & ~np.isnan(data_SMAP_pm.longitude_pm)
+                            if qual_level > 0:
+                                qual_flags = unpackbits(data_SMAP_pm.retrieval_qual_flag_pm.values.astype(int),4)
+                                mask_data_valid = mask_data_valid & (qual_flags[:,:,0]==0)
+                            sm_pm = data_SMAP_pm.soil_moisture_pm.where(mask_data_valid)
+                            lons_pm = data_SMAP_pm.longitude_pm.where(mask_data_valid)
+                            lats_pm = data_SMAP_pm.latitude_pm.where(mask_data_valid)
+                            sm = combine_dd(sm_am.values, sm_pm.values)
+                            lats = combine_dd(lats_am.values, lats_pm.values)
+                            lons = combine_dd(lons_am.values, lons_pm.values)
+                            sm = drop_nan_and_flatten(sm)
+                            lats = drop_nan_and_flatten(lats)
+                            lons = drop_nan_and_flatten(lons)
                         else:
                             raise RuntimeError('mode should be am or pm')
 
