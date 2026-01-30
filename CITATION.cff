@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "eCLM-ESMDA framework for joint SM and ET assimilation"
+version: "1.0"
+date-released: 2026-01-30
+type: software
+
+authors:
+  - given-names: Haojin
+    family-names: Zhao
+    affiliation: Institute of Bio- and Geosciences: Agrosphere (IBG-3), Forschungszentrum Jülich, Jülich, Germany
+    orcid: https://orcid.org/0000-0003-2477-2665
+
+repository-code: https://github.com/zhao7777/TSMP_DA
+url: https://github.com/zhao7777
+
+abstract: >
+  This software provides a framework for generating a high-resolution land
+  surface reanalysis over Europe by jointly assimilating soil moisture and
+  evapotranspiration using an iterative Ensemble Smoother data assimilation
+  approach. 
+
+keywords:
+  - land surface modelling
+  - soil moisture
+  - evapotranspiration
+  - data assimilation
+  - Ensemble Smoother
+  - hydrology
+
+license: MIT
+
+preferred-citation:
+  type: software
+  authors:
+    - given-names: Haojin
+      family-names: Zhao
+    - given-names: Mikael
+      family-names: Kaandorp
+    - given-names: Harrie-Jan
+      family-names: Hendricks Franssen
+  title: "eCLM-ESMDA framework for joint SM and ET assimilation"
+  version: "1.0"
+  year: 2026
+  doi: 10.5281/zenodo.18428014
